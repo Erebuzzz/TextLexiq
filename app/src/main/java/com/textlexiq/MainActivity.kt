@@ -54,7 +54,9 @@ fun AppNavHost(navController: NavHostController) {
             HomeScreen(
                 navigateToScanner = { navController.navigate(Screen.Scanner.route) },
                 navigateToOcr = { navController.navigate(Screen.Ocr.route) },
-                navigateToDocument = { navController.navigate(Screen.Document.route) },
+                navigateToDocument = { documentId -> 
+                    navController.navigate(Screen.Document.createRoute(documentId)) 
+                },
                 navigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
@@ -104,8 +106,20 @@ fun AppNavHost(navController: NavHostController) {
                 cleanedImagePath = imagePath
             )
         }
-        composable(Screen.Document.route) {
-            DocumentViewScreen(onBack = navController::popBackStack)
+        composable(
+            route = Screen.Document.routeWithArgs(),
+            arguments = listOf(
+                navArgument(Screen.Document.documentIdArg) {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                }
+            )
+        ) { backStackEntry ->
+            val documentId = backStackEntry.arguments?.getLong(Screen.Document.documentIdArg) ?: -1L
+            DocumentViewScreen(
+                documentId = if (documentId >= 0) documentId else null,
+                onBack = navController::popBackStack
+            )
         }
         composable(Screen.Settings.route) {
             SettingsScreen(onBack = navController::popBackStack)

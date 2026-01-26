@@ -24,7 +24,8 @@ object AppViewModelProvider {
             DocumentViewModel(
                 savedStateHandle = this.createSavedStateHandle(),
                 repository = application.container.repository,
-                exporter = DocumentExporter.default()
+                exporter = DocumentExporter.default(),
+                application = application
             )
         }
     }

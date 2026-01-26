@@ -10,5 +10,11 @@ data class DocumentEntity(
     val content: String,
     val confidence: Float,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    // Metadata fields
+    val sourceImagePath: String? = null,
+    val ocrEngine: String = "mlkit",
+    val language: String = "en",
+    val tags: String = "",  // Comma-separated tags
+    val latexContent: String? = null  // Generated LaTeX source
 )

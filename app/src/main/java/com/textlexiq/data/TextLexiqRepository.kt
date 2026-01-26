@@ -6,7 +6,6 @@ import com.textlexiq.data.model.DocumentSummary
 import com.textlexiq.utils.formatRelativeTime
 import java.time.Clock
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.flow.Flow
@@ -24,19 +23,69 @@ class TextLexiqRepository internal constructor(
             documents.map { it.toSummary() }
         }
 
-    suspend fun saveDocument(content: String, confidence: Float): Long {
+    suspend fun saveDocument(
+        content: String,
+        confidence: Float,
+        sourceImagePath: String? = null,
+        ocrEngine: String = "mlkit",
+        language: String = "en"
+    ): Long {
         val now = clock.millis()
         val entity = DocumentEntity(
             title = generateTitle(content, now),
             content = content,
             confidence = confidence,
             createdAt = now,
-            updatedAt = now
+            updatedAt = now,
+            sourceImagePath = sourceImagePath,
+            ocrEngine = ocrEngine,
+            language = language
         )
         return documentDao.insert(entity)
     }
 
     suspend fun getDocumentById(id: Long): DocumentEntity? = documentDao.getDocumentById(id)
+
+    suspend fun updateDocument(document: DocumentEntity): DocumentEntity {
+        val updated = document.copy(updatedAt = clock.millis())
+        documentDao.update(updated)
+        return updated
+    }
+
+    suspend fun deleteDocument(id: Long) {
+        documentDao.deleteById(id)
+    }
+
+    suspend fun updateDocumentContent(id: Long, newContent: String, newTitle: String? = null): Boolean {
+        val existing = documentDao.getDocumentById(id) ?: return false
+        val updated = existing.copy(
+            content = newContent,
+            title = newTitle ?: existing.title,
+            updatedAt = clock.millis()
+        )
+        documentDao.update(updated)
+        return true
+    }
+
+    suspend fun updateDocumentTags(id: Long, tags: List<String>): Boolean {
+        val existing = documentDao.getDocumentById(id) ?: return false
+        val updated = existing.copy(
+            tags = tags.joinToString(","),
+            updatedAt = clock.millis()
+        )
+        documentDao.update(updated)
+        return true
+    }
+
+    suspend fun updateLatexContent(id: Long, latexContent: String): Boolean {
+        val existing = documentDao.getDocumentById(id) ?: return false
+        val updated = existing.copy(
+            latexContent = latexContent,
+            updatedAt = clock.millis()
+        )
+        documentDao.update(updated)
+        return true
+    }
 
     private fun DocumentEntity.toSummary(): DocumentSummary {
         val summaryText = content.lines().firstOrNull()?.take(SUMMARY_PREVIEW_LENGTH)
@@ -92,4 +141,22 @@ private class InMemoryDocumentDao : DocumentDao {
         }
         return assignedId
     }
+
+    override suspend fun update(document: DocumentEntity) {
+        documents.update { current ->
+            current.map { if (it.id == document.id) document else it }
+        }
+    }
+
+    override suspend fun deleteById(id: Long) {
+        documents.update { current ->
+            current.filterNot { it.id == id }
+        }
+    }
+
+    override fun observeDocumentsByTag(tag: String): Flow<List<DocumentEntity>> =
+        documents.map { list ->
+            list.filter { it.tags.contains(tag, ignoreCase = true) }
+        }
 }
+

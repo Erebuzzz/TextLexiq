@@ -2,6 +2,7 @@ package com.textlexiq.data
 
 import android.content.Context
 import androidx.room.Room
+import com.textlexiq.data.local.MIGRATION_1_2
 import com.textlexiq.data.local.TextLexiqDatabase
 
 interface AppContainer {
@@ -15,7 +16,8 @@ class DefaultAppContainer(context: Context) : AppContainer {
             context,
             TextLexiqDatabase::class.java,
             "textlexiq-database"
-        ).fallbackToDestructiveMigration()
+        )
+            .addMigrations(MIGRATION_1_2)
             .build()
     }
 
@@ -23,3 +25,4 @@ class DefaultAppContainer(context: Context) : AppContainer {
         TextLexiqRepository.create(database.documentDao())
     }
 }
+

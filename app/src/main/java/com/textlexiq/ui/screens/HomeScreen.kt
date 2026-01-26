@@ -32,7 +32,7 @@ import com.textlexiq.viewmodel.HomeViewModel
 fun HomeScreen(
     navigateToScanner: () -> Unit,
     navigateToOcr: () -> Unit,
-    navigateToDocument: () -> Unit,
+    navigateToDocument: (Long) -> Unit,
     navigateToSettings: () -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
@@ -89,7 +89,7 @@ fun HomeScreen(
                         overlineContent = { Text(text = document.lastUpdatedLabel) },
                         modifier = Modifier.clickable {
                             viewModel.onAction(HomeAction.OpenDocument(document.id))
-                            navigateToDocument()
+                            navigateToDocument(document.id.toLong())
                         }
                     )
                 }

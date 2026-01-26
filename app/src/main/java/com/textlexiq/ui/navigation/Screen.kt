@@ -24,6 +24,13 @@ sealed class Screen(val route: String, val title: String) {
             "$route?${imagePathArg}=${Uri.encode(imagePath)}"
     }
 
-    object Document : Screen("document", "Documents")
+    object Document : Screen("document", "Documents") {
+        const val documentIdArg = "documentId"
+
+        fun routeWithArgs(): String = "$route?${documentIdArg}={${documentIdArg}}"
+
+        fun createRoute(documentId: Long): String =
+            "$route?${documentIdArg}=$documentId"
+    }
     object Settings : Screen("settings", "Settings")
 }
