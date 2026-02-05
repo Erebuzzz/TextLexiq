@@ -30,7 +30,14 @@ data class DocumentViewUiState(
     val isSaving: Boolean = false,
     val isExporting: Boolean = false,
     val exportMessage: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val shareUri: android.net.Uri? = null, // Trigger for sharing
+    val shareMimeType: String? = null,
+    // AI States
+    val isGeneratingAi: Boolean = false,
+    val showAiResultDialog: Boolean = false,
+    val aiResultTitle: String = "", // "Summary" or "Simplified"
+    val aiResultContent: String = ""
 )
 
 enum class ExportFormat {
@@ -47,14 +54,21 @@ sealed interface DocumentAction {
     data class UpdateContent(val content: String) : DocumentAction
     data class UpdateTitle(val title: String) : DocumentAction
     data class UpdateTags(val tags: List<String>) : DocumentAction
+    object Summarize : DocumentAction
+    object Simplify : DocumentAction
+    object CloseAiResult : DocumentAction
+    object Shared : DocumentAction // Reset share state
 }
 
 class DocumentViewModel(
     savedStateHandle: SavedStateHandle,
     private val repository: TextLexiqRepository,
     private val exporter: DocumentExporter = DocumentExporter.default(),
+    private val smartModelRouter: com.textlexiq.llm.router.SmartModelRouter,
     private val application: android.app.Application
 ) : androidx.lifecycle.AndroidViewModel(application) {
+
+    // ... existing init ...
 
     private val documentId: Long = savedStateHandle.get<Long>(Screen.Document.documentIdArg) ?: -1L
 
@@ -117,13 +131,53 @@ class DocumentViewModel(
             is DocumentAction.UpdateContent -> updateContent(action.content)
             is DocumentAction.UpdateTitle -> updateTitle(action.title)
             is DocumentAction.UpdateTags -> updateTags(action.tags)
+            DocumentAction.Summarize -> transformText("Summarize this document in 3 concise bullet points:", "Summary")
+            DocumentAction.Simplify -> transformText("Simplify this text to be easy to understand for a 5th grader:", "Simplified")
+            DocumentAction.CloseAiResult -> _uiState.update { it.copy(showAiResultDialog = false) }
+            DocumentAction.Shared -> _uiState.update { it.copy(shareUri = null, shareMimeType = null) }
+        }
+    }
+
+    private fun transformText(instruction: String, title: String) {
+        val content = _uiState.value.content
+        if (content.isBlank()) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGeneratingAi = true, error = null) }
+            try {
+                // Combine instruction + content
+                val prompt = "$instruction\n\n$content"
+                // Simplify implies easier reading, Summarize implies shorter
+                // Both are "creative" but Summarize can be done by on-device if short.
+                // Simplify might need better language model.
+                // Let's assume Cloud for Simplify (high intelligence) and Router decided for Summary.
+                val requiresHighIntelligence = title == "Simplified"
+                
+                val result = smartModelRouter.generateWithRouting(prompt, requiresHighIntelligence)
+                
+                _uiState.update { 
+                    it.copy(
+                        isGeneratingAi = false,
+                        showAiResultDialog = true,
+                        aiResultTitle = title,
+                        aiResultContent = result
+                    ) 
+                }
+            } catch (e: Exception) {
+                _uiState.update { 
+                    it.copy(
+                        isGeneratingAi = false, 
+                        error = "AI Generation failed: ${e.message}"
+                    ) 
+                }
+            }
         }
     }
 
     private fun exportDocument(format: ExportFormat) {
         val doc = currentDocument ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isExporting = true) }
+            _uiState.update { it.copy(isExporting = true, exportMessage = null) }
             try {
                 // Use external cache dir for sharing
                 val cacheDir = application.externalCacheDir ?: application.cacheDir
@@ -151,11 +205,25 @@ class DocumentViewModel(
 
                 if (result.isSuccess) {
                     val file = result.getOrThrow()
-                    // TODO: Trigger share intent
+                    
+                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                        application,
+                        "${application.packageName}.fileprovider",
+                        file
+                    )
+                    
+                    val mimeType = when (format) {
+                        ExportFormat.PDF -> "application/pdf"
+                        ExportFormat.DOCX -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        ExportFormat.LATEX -> "text/x-tex"
+                    }
+
                     _uiState.update { 
                         it.copy(
                             isExporting = false, 
-                            exportMessage = "Exported to ${file.name}. (Sharing implementation pending)" 
+                            shareUri = uri,
+                            shareMimeType = mimeType,
+                            exportMessage = if (format == ExportFormat.LATEX) "Exported. Share to TeX Live/Termux to compile." else null
                         ) 
                     }
                 } else {

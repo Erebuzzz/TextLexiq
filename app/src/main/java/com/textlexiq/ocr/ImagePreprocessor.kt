@@ -12,6 +12,114 @@ import kotlin.math.sqrt
 
 object ImagePreprocessor {
 
+    /**
+     * Enhances the image for OCR by applying:
+     * 1. Grayscale conversion
+     * 2. Skew correction (deskewing)
+     * 3. Adaptive thresholding (binarization)
+     * 4. Denoising
+     */
+    fun enhanceForOcr(bitmap: Bitmap): Bitmap {
+        val mat = Mat()
+        Utils.bitmapToMat(bitmap, mat)
+
+        // 1. Grayscale
+        val gray = Mat()
+        if (mat.channels() > 1) {
+            Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+        } else {
+            mat.copyTo(gray)
+        }
+
+        // 2. Deskew
+        val deskewed = correctSkew(gray)
+
+        // 3. Binarize (Adaptive Threshold)
+        val binary = Mat()
+        Imgproc.adaptiveThreshold(
+            deskewed,
+            binary,
+            255.0,
+            Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
+            Imgproc.THRESH_BINARY,
+            31, // Block size
+            15.0 // Constant c
+        )
+
+        // 4. Convert back to Bitmap
+        // Create output bitmap. Note: ARGB_8888 is standard for Android UI
+        val result = Bitmap.createBitmap(binary.cols(), binary.rows(), Bitmap.Config.ARGB_8888)
+        
+        // Convert single channel binary back to 4-channel for Bitmap
+        val finalMat = Mat()
+        Imgproc.cvtColor(binary, finalMat, Imgproc.COLOR_GRAY2RGBA)
+        Utils.matToBitmap(finalMat, result)
+
+        // Cleanup
+        mat.release()
+        gray.release()
+        if (deskewed != gray) deskewed.release()
+        binary.release()
+        finalMat.release()
+
+        return result
+    }
+
+    private fun correctSkew(gray: Mat): Mat {
+        // Invert threshold to get white text on black background for contour/moment analysis
+        val binary = Mat()
+        Imgproc.threshold(gray, binary, 0.0, 255.0, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU)
+
+        // Find all non-zero points (text pixels)
+        val points = MatOfPoint()
+        org.opencv.core.Core.findNonZero(binary, points)
+        
+        // If no text found, return original
+        if (points.empty()) {
+            binary.release()
+            points.release()
+            return gray
+        }
+
+        // Calculate minimum area rectangle covering all text
+        val points2f = MatOfPoint2f(*points.toArray())
+        val rotatedRect = Imgproc.minAreaRect(points2f)
+        
+        points.release()
+        points2f.release()
+        binary.release()
+
+        var angle = rotatedRect.angle
+        
+        // Normalize angle to horizontal
+        if (angle < -45.0) {
+            angle += 90.0
+        } else if (angle > 45.0) {
+            angle -= 90.0
+        }
+
+        // If angle is negligible, don't rotate
+        if (kotlin.math.abs(angle) < 0.5) {
+            return gray
+        }
+
+        val center = rotatedRect.center
+        val rotMat = Imgproc.getRotationMatrix2D(center, angle, 1.0)
+        
+        val rotated = Mat()
+        Imgproc.warpAffine(
+            gray, 
+            rotated, 
+            rotMat, 
+            gray.size(), 
+            Imgproc.INTER_CUBIC + Imgproc.WARP_FILL_OUTLIERS, 
+            org.opencv.core.Core.BORDER_REPLICATE
+        )
+        
+        rotMat.release()
+        return rotated
+    }
+
     fun preprocess(bitmap: Bitmap): Bitmap {
         val mat = Mat()
         Utils.bitmapToMat(bitmap, mat)

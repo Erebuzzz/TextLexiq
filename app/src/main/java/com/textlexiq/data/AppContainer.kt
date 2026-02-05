@@ -4,12 +4,16 @@ import android.content.Context
 import androidx.room.Room
 import com.textlexiq.data.local.MIGRATION_1_2
 import com.textlexiq.data.local.TextLexiqDatabase
+import com.textlexiq.data.UserPreferencesRepository
 
 interface AppContainer {
-    val repository: TextLexiqRepository
+    val textLexiqRepository: TextLexiqRepository
+    val userPreferencesRepository: UserPreferencesRepository
+    val smartModelRouter: com.textlexiq.llm.router.SmartModelRouter
+    val modelManager: com.textlexiq.data.model.ModelManager
 }
 
-class DefaultAppContainer(context: Context) : AppContainer {
+class DefaultAppContainer(private val context: Context) : AppContainer {
 
     private val database: TextLexiqDatabase by lazy {
         Room.databaseBuilder(
@@ -21,8 +25,20 @@ class DefaultAppContainer(context: Context) : AppContainer {
             .build()
     }
 
-    override val repository: TextLexiqRepository by lazy {
+    override val textLexiqRepository: TextLexiqRepository by lazy {
         TextLexiqRepository.create(database.documentDao())
+    }
+
+    override val userPreferencesRepository: UserPreferencesRepository by lazy {
+        UserPreferencesRepository(context)
+    }
+
+    override val smartModelRouter: com.textlexiq.llm.router.SmartModelRouter by lazy {
+        com.textlexiq.llm.router.SmartModelRouter()
+    }
+
+    override val modelManager: com.textlexiq.data.model.ModelManager by lazy {
+        com.textlexiq.data.model.ModelManager(context)
     }
 }
 

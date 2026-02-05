@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -78,6 +80,22 @@ fun DocumentViewScreen(
     LaunchedEffect(state.exportMessage) {
         state.exportMessage?.let {
             snackbarHostState.showSnackbar(it)
+        }
+    }
+
+    // Handle Share Intent
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(state.shareUri) {
+        state.shareUri?.let { uri ->
+            val type = state.shareMimeType ?: context.contentResolver.getType(uri) ?: "application/*"
+            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                // Add subject/text if desired
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                setType(type)
+            }
+            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Document"))
+            viewModel.onAction(DocumentAction.Shared)
         }
     }
 
@@ -185,6 +203,23 @@ fun DocumentViewScreen(
                                         showExportMenu = false
                                     }
                                 )
+                                androidx.compose.material3.HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Summarize (AI)") },
+                                    onClick = { 
+                                        viewModel.onAction(DocumentAction.Summarize)
+                                        showExportMenu = false
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Simplify (AI)") },
+                                    onClick = { 
+                                        viewModel.onAction(DocumentAction.Simplify)
+                                        showExportMenu = false
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.AutoFixHigh, contentDescription = null) }
+                                )
                             }
                         }
 
@@ -217,6 +252,33 @@ fun DocumentViewScreen(
             }
         }
     ) { padding ->
+        com.textlexiq.ui.components.LoadingOverlay(
+            isVisible = state.isExporting || state.isSaving || state.isGeneratingAi,
+            message = when {
+                state.isExporting -> "Exporting Document..."
+                state.isSaving -> "Saving Changes..."
+                state.isGeneratingAi -> "Generating AI Result..."
+                else -> "Processing..."
+            }
+        )
+        
+        if (state.showAiResultDialog) {
+            AlertDialog(
+                onDismissRequest = { viewModel.onAction(DocumentAction.CloseAiResult) },
+                title = { Text(text = state.aiResultTitle) },
+                text = { 
+                    Column {
+                        Text(state.aiResultContent)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.onAction(DocumentAction.CloseAiResult) }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
+
         when {
             state.isLoading -> {
                 Box(

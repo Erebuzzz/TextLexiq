@@ -24,7 +24,8 @@ data class OcrUiState(
     val isProcessing: Boolean = false,
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
-    val savedDocumentId: String? = null
+    val savedDocumentId: String? = null,
+    val ocrBlocks: List<com.textlexiq.ocr.OCRBlock> = emptyList()
 )
 
 sealed interface OcrAction {
@@ -103,6 +104,7 @@ class OcrViewModel(
                 extractedText = sanitizedText,
                 editedText = sanitizedText,
                 confidence = result.confidence,
+                ocrBlocks = result.blocks,
                 errorMessage = null
             )
         }

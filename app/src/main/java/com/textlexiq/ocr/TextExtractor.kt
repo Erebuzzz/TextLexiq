@@ -1,38 +1,30 @@
 package com.textlexiq.ocr
 
 import android.graphics.Bitmap
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-data class OCRResult(val text: String, val confidence: Float)
-
-class TextExtractor {
-
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+class TextExtractor(private val engine: OCREngine) {
 
     suspend fun extract(bitmap: Bitmap): OCRResult {
-        val image = InputImage.fromBitmap(bitmap, 0)
-        val visionText = recognizer.process(image).await()
-        val confidences = visionText.textBlocks
-            .mapNotNull { block ->
-                block.confidence.takeIf { it in 0f..1f }
-            }
-
-        val averageConfidence = if (confidences.isNotEmpty()) {
-            confidences.average().toFloat()
-        } else {
-            0f
+        // Preprocess image using OpenCV (Deskew, Binarize)
+        val enhancedBitmap = withContext(Dispatchers.Default) {
+             ImagePreprocessor.enhanceForOcr(bitmap)
         }
-
-        return OCRResult(
-            text = visionText.text,
-            confidence = averageConfidence
-        )
+        
+        return engine.extract(enhancedBitmap)
     }
 
     companion object {
-        fun preview(): TextExtractor = TextExtractor()
+        fun create(engineType: String = "mlkit", context: android.content.Context? = null): TextExtractor {
+            val engine = when (engineType) {
+                "tesseract" -> if (context != null) TesseractOCREngine(context) else MLKitOCREngine()
+                else -> MLKitOCREngine()
+            }
+            return TextExtractor(engine)
+        }
+        
+        // Helper for previews/tests
+        fun preview(): TextExtractor = TextExtractor(MLKitOCREngine())
     }
 }

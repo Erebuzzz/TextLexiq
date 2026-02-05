@@ -26,30 +26,61 @@ import com.textlexiq.ui.theme.TextLexiqTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val appContainer = (application as TextLexiqApp).container
         setContent {
-            TextLexiqApp()
+            TextLexiqApp(userPreferencesRepository = appContainer.userPreferencesRepository)
         }
     }
 }
 
 @Composable
-fun TextLexiqApp(navController: NavHostController = rememberNavController()) {
-    TextLexiqTheme {
+fun TextLexiqApp(
+    navController: NavHostController = rememberNavController(),
+    userPreferencesRepository: com.textlexiq.data.UserPreferencesRepository? = null
+) {
+    // If repo is provided (from Activity), use it. Otherwise default (preview/test).
+    val isDark = userPreferencesRepository?.darkModeEnabled
+        ?.androidx.lifecycle.compose.collectAsStateWithLifecycle(initialValue = true)
+        ?.value ?: true
+
+    TextLexiqTheme(useDarkTheme = isDark) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            AppNavHost(navController = navController)
+            AppNavHost(
+                navController = navController,
+                userPreferencesRepository = userPreferencesRepository
+            )
         }
     }
 }
 
 @Composable
-fun AppNavHost(navController: NavHostController) {
+fun AppNavHost(
+    navController: NavHostController,
+    userPreferencesRepository: com.textlexiq.data.UserPreferencesRepository? = null
+) {
+    val isFirstRun = userPreferencesRepository?.isFirstRun
+        ?.androidx.lifecycle.compose.collectAsStateWithLifecycle(initialValue = false)
+        ?.value ?: false
+
+    val startDestination = if (isFirstRun) Screen.Onboarding.route else Screen.Home.route
+
     NavHost(
         navController = navController,
-        startDestination = Screen.Home.route
+        startDestination = startDestination
     ) {
+        composable(Screen.Onboarding.route) {
+            com.textlexiq.ui.screens.OnboardingScreen(
+                userPreferencesRepository = userPreferencesRepository!!,
+                onComplete = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
+                }
+            )
+        }
         composable(Screen.Home.route) {
             HomeScreen(
                 navigateToScanner = { navController.navigate(Screen.Scanner.route) },
@@ -122,7 +153,16 @@ fun AppNavHost(navController: NavHostController) {
             )
         }
         composable(Screen.Settings.route) {
-            SettingsScreen(onBack = navController::popBackStack)
+            SettingsScreen(
+                onBack = navController::popBackStack,
+                onNavigateToModels = { navController.navigate(Screen.ModelManagement.route) }
+            )
+        }
+        
+        composable(Screen.ModelManagement.route) {
+            com.textlexiq.ui.screens.ModelManagementScreen(
+                onBack = navController::popBackStack
+            )
         }
     }
 }

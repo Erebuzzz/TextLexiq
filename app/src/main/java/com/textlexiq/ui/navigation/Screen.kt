@@ -33,4 +33,6 @@ sealed class Screen(val route: String, val title: String) {
             "$route?${documentIdArg}=$documentId"
     }
     object Settings : Screen("settings", "Settings")
+    object ModelManagement : Screen("model_management", "AI Models")
+    object Onboarding : Screen("onboarding", "Welcome")
 }

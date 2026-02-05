@@ -3,10 +3,14 @@ package com.textlexiq.llm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class LlamaCppClient {
+class LlamaCppClient : LLMEngine {
 
-    suspend fun summarize(text: String): String = withContext(Dispatchers.IO) {
+    override val tier: EngineTier = EngineTier.ON_DEVICE
+
+    override suspend fun generate(prompt: String): String = withContext(Dispatchers.IO) {
         // TODO: Bridge llama.cpp JNI bindings and execute inference.
-        "Summary placeholder"
+        "LlamaCpp (Device): Summary of $prompt"
     }
+    
+    // Additional methods for JNI setup...
 }

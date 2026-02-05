@@ -40,15 +40,36 @@ Build a mobile-first document intelligence workspace that lets users capture pap
 
 ---
 
+### Document Viewing & Editing
+- [x] Document view screen loads by ID and displays content.
+- [x] Document editing mode implemented with save/discard.
+- [x] Metadata fields added (source, engine, language, tags).
+- [x] `DocumentDao` and Repository updated for CRUD operations.
+
+### Exporting
+- [x] PDF export implemented using iText7.
+- [x] DOCX export implemented using Apache POI.
+- [x] LaTeX code generation added.
+- [x] Export action menu in UI with format selection.
+
+### OCR Enhancements
+- [x] Advanced OpenCV preprocessing: Deskewing (minAreaRect), Binarization (Adaptive Threshold), Grayscale.
+- [x] Text block sorting in `TextExtractor` for reliable reading order.
+- [x] Skew correction implemented.
+
+### LLM Optimization
+- [x] `TokenOptimizer`: Whitespace compression and stopword removal.
+- [x] `SmartModelRouter`: Floating access logic (On-Device vs Cloud).
+- [x] `LLMEngine` architecture defined.
+
+---
+
 ## ⚠️ Partially Implemented / Needs Hardening
 
 ### OCR & Confidence
-- Confidence is averaged from text blocks (ML Kit only supports block-level confidence).
-- No line/word-level confidence or bounding boxes surfaced in UI.
-
-### Document Viewing
-- Document view screen is still placeholder (no load by ID).
-- No editing or re-export from stored documents.
+- Confidence is averaged from blocks. Visual overlays missing.
+- Tesseract (tess-two) implementation optional/pending.
+- Auto-language detection pending.
 
 ### Error Handling
 - Basic errors surfaced in UI, but no retry strategies or offline recovery.
@@ -57,28 +78,22 @@ Build a mobile-first document intelligence workspace that lets users capture pap
 
 ## 🚧 Remaining Work (Detailed)
 
-### 1) OCR Enhancements
-- Option to switch between ML Kit and Tesseract (tess-two) with language packs.
+### 1) OCR Future Work
+- Option to switch between ML Kit and Tesseract (tess-two).
 - Support multiple languages and auto-language detection.
 - Add visual OCR overlays for confidence highlighting.
 
-### 2) Document Pipeline & Storage
-- Update `DocumentViewScreen` to load by ID and show saved document content.
-- Support updating an existing document (edit + save).
-- Add metadata fields: source image path, OCR engine, language, tags.
 
-### 3) Exporting
-- Implement PDF export using iText.
-- Implement DOCX export using Apache POI.
-- Allow share/export actions from document detail screen.
+### 2) LLM Integration [DONE]
+- [x] Design `LLMEngine` interface (abstraction for On-Device vs Cloud).
+- [x] Implement `TokenOptimizer` (Stopword removal, context compression).
+- [x] Implement `SmartModelRouter` (Floating access: Route based on complexity/cost).
+- [x] Implement `LlamaCppClient` (On-Device Tier).
+- [x] Implement `CloudLLMClient` (Paid Tier).
+- [x] Integrate LLM features into UI (Summarize, Simplify).
 
-### 4) LLM Integration
-- Add `llm` module plumbing with llama.cpp JNI wrapper.
-- Summarize, extract keywords, generate outlines from OCR text.
-- Toggle on-device vs cloud LLM in settings.
-
-### 5) Scanner UX
-- Auto edge detection overlay using real-time frame analysis.
+### 3) Scanner UX
+- Implement auto edge detection interface (OpenCV contors logic exists, need UI overlay).
 - Auto capture when page is stable inside the guide.
 - Manual crop corners (drag handles) instead of slider-only crop.
 
@@ -91,6 +106,12 @@ Build a mobile-first document intelligence workspace that lets users capture pap
 - Unit tests for preprocessing and repository layers.
 - Instrumentation tests for CameraX and OCR flows.
 - Validate OpenCV initialization on device (not just debug).
+
+### 8) Cross-Platform & Server (Future - Daytona/LeanMCP)
+- Create `TextLexiq Server` (Python) for Daytona/LeanMCP.
+- Port OpenCV/OCR pipeline to Python (pip package).
+- Create `textlexiq-js` client (npm package).
+- Deploy MCP Server to LeanMCP.
 
 ---
 
