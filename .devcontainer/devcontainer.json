@@ -1,0 +1,27 @@
+{
+  "name": "TextLexiq Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/java:1-17-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/android:1": {
+      "version": "latest",
+      "installCmdLineTools": true
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.10"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "ms-python.python",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  },
+  "remoteUser": "vscode",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y cmake ninja-build libopencv-dev && pip install opencv-python-headless numpy && npm install -g @leanmcp/cli"
+}

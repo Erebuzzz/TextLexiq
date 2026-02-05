@@ -7,6 +7,7 @@ import com.textlexiq.llm.client.LlamaCppClient
 import com.textlexiq.llm.client.CloudLLMClient
 
 class SmartModelRouter(
+    private val modelManager: com.textlexiq.data.model.ModelManager,
     private val onDeviceEngine: LLMEngine = LlamaCppClient(),
     private val cloudEngine: LLMEngine = CloudLLMClient(apiKey = "mock_key")
 ) {
@@ -19,25 +20,26 @@ class SmartModelRouter(
      * @return The selected LLMEngine.
      */
     fun route(prompt: String, requiresHighIntelligence: Boolean = false): LLMEngine {
-        val estimatedTokens = TokenOptimizer.estimateTokens(prompt)
-        
-        // Strategy: "Floating Access"
-        // 1. If task is explicitly marked as complex, use Cloud (Premium/Basic).
-        // 2. If task is simple/short, prefer On-Device to save cost and latency.
-        // 3. Threshold: 500 tokens (~2000 chars) is roughly the limit for efficient small on-device models on mobile.
-        
+        // If high intelligence is required, always go to cloud for now
         if (requiresHighIntelligence) {
             return cloudEngine
         }
 
-        if (estimatedTokens < 500) {
-            // Task is small enough for on-device (e.g. summarizing a receipt or short letter)
-            // Provided the on-device engine is actually available/capable.
-            // Assuming onDeviceEngine represents a verified working local model.
-            return onDeviceEngine
+        // Check if On-Device Model is available (Downloaded)
+        val onDeviceModelAvailable = modelManager.models.value.any { 
+            it.type == com.textlexiq.data.model.ModelType.LLM_ON_DEVICE && it.isDownloaded 
+        }
+
+        if (onDeviceModelAvailable) {
+            // Check token count suitability
+            val estimatedTokens = TokenOptimizer.estimateTokens(prompt)
+            if (estimatedTokens < 800) { 
+                // Increased threshold since Phi-3 is decent
+                return onDeviceEngine
+            }
         }
         
-        // Default to cloud for larger contexts
+        // Default request unavailable or too complex/long for local
         return cloudEngine
     }
     

@@ -6,13 +6,16 @@ sealed class Screen(val route: String, val title: String) {
     object Home : Screen("home", "Home")
     object Scanner : Screen("scanner", "Scanner")
 
-    object Crop : Screen("crop", "Crop & Preview") {
+    object Crop : Screen("crop/{imagePath}?corners={corners}", "Adjust") {
         const val imagePathArg = "imagePath"
+        const val cornersArg = "corners"
 
-        fun routeWithArgs(): String = "$route?${imagePathArg}={${imagePathArg}}"
+        fun routeWithArgs(): String = "crop/{$imagePathArg}?corners={$cornersArg}"
 
-        fun createRoute(imagePath: String): String =
-            "$route?${imagePathArg}=${Uri.encode(imagePath)}"
+        fun createRoute(path: String, corners: String? = null): String {
+             val cornersParam = corners ?: ""
+             return "crop/${Uri.encode(path)}?corners=${Uri.encode(cornersParam)}"
+        }
     }
 
     object Ocr : Screen("ocr", "OCR") {

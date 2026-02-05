@@ -16,11 +16,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-data class CropBounds(
-    val left: Float,
-    val top: Float,
-    val right: Float,
-    val bottom: Float
+// Retaining CropBounds for simpler layouts if needed, but adding Corners support
+data class CropCorners(
+    val tl: android.graphics.PointF,
+    val tr: android.graphics.PointF,
+    val br: android.graphics.PointF,
+    val bl: android.graphics.PointF
 )
 
 data class CropUiState(
@@ -37,16 +38,20 @@ class CropViewModel : ViewModel() {
     fun processImage(
         context: Context,
         sourcePath: String,
-        cropBounds: CropBounds
+        corners: CropCorners
     ) {
         viewModelScope.launch(Dispatchers.Default) {
-            _uiState.update { it.copy(isProcessing = true, errorMessage = null) }
+             _uiState.update { it.copy(isProcessing = true, errorMessage = null) }
 
             runCatching {
                 val original = BitmapFactory.decodeFile(sourcePath)
                     ?: error("Unable to decode captured image.")
-                val cropped = cropBitmap(original, cropBounds)
-                val processed = ImagePreprocessor.preprocess(cropped)
+                
+                // Use OpenCV Perspective Transform
+                val cornerList = listOf(corners.tl, corners.tr, corners.br, corners.bl)
+                val cropped = com.textlexiq.scanner.ImageTransformer.correctPerspective(original, cornerList)
+                
+                val processed = ImagePreprocessor.finalizeForOcr(cropped)
 
                 val outputFile = createProcessedFile(context)
                 FileOutputStream(outputFile).use { stream ->
@@ -73,16 +78,5 @@ class CropViewModel : ViewModel() {
     private fun createProcessedFile(context: Context): File {
         val directory = File(context.filesDir, "processed").apply { if (!exists()) mkdirs() }
         return File.createTempFile("processed_", ".jpg", directory)
-    }
-
-    private fun cropBitmap(source: Bitmap, bounds: CropBounds): Bitmap {
-        val leftPx = (bounds.left * source.width).roundToInt().coerceIn(0, source.width - 2)
-        val rightPx = (bounds.right * source.width).roundToInt().coerceIn(leftPx + 1, source.width - 1)
-        val topPx = (bounds.top * source.height).roundToInt().coerceIn(0, source.height - 2)
-        val bottomPx = (bounds.bottom * source.height).roundToInt().coerceIn(topPx + 1, source.height - 1)
-
-        val width = (rightPx - leftPx).coerceAtLeast(1)
-        val height = (bottomPx - topPx).coerceAtLeast(1)
-        return Bitmap.createBitmap(source, leftPx, topPx, width, height)
     }
 }

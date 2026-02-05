@@ -156,6 +156,43 @@ object ImagePreprocessor {
         return outputBitmap
     }
 
+    /**
+     * Preprocesses an image that has already been cropped/warped by the user.
+     * Skips geometric transformations and only applies visual enhancement.
+     */
+    fun finalizeForOcr(bitmap: Bitmap): Bitmap {
+        val mat = Mat()
+        Utils.bitmapToMat(bitmap, mat)
+
+        val denoised = Mat()
+        Imgproc.GaussianBlur(mat, denoised, Size(3.0, 3.0), 0.0)
+
+        val gray = Mat()
+        Imgproc.cvtColor(denoised, gray, Imgproc.COLOR_BGR2GRAY)
+
+        val binarized = Mat()
+        Imgproc.adaptiveThreshold(
+            gray,
+            binarized,
+            255.0,
+            Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
+            Imgproc.THRESH_BINARY,
+            35,
+            10.0
+        )
+
+        val outputBitmap = Bitmap.createBitmap(binarized.cols(), binarized.rows(), Bitmap.Config.ARGB_8888)
+        Imgproc.cvtColor(binarized, binarized, Imgproc.COLOR_GRAY2BGR)
+        Utils.matToBitmap(binarized, outputBitmap)
+
+        mat.release()
+        denoised.release()
+        gray.release()
+        binarized.release()
+
+        return outputBitmap
+    }
+
     private fun correctPerspective(gray: Mat): Mat {
         val edges = Mat()
         Imgproc.Canny(gray, edges, 75.0, 200.0)

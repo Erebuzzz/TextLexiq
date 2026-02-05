@@ -95,20 +95,33 @@ fun AppNavHost(
             ScannerScreen(
                 onBack = navController::popBackStack,
                 onImageCaptured = { capturedPath ->
-                    navController.navigate(Screen.Crop.createRoute(capturedPath))
+                    // Serialize corners
+                    val corners = viewModel.uiState.value.detectedCorners
+                    val cornersString = if (corners.size == 4) {
+                        corners.joinToString(",") { "${it.x},${it.y}" }
+                    } else null
+                    navController.navigate(Screen.Crop.createRoute(capturedPath, cornersString))
                 }
             )
         }
         composable(
             route = Screen.Crop.routeWithArgs(),
             arguments = listOf(
-                navArgument(Screen.Crop.imagePathArg) { type = NavType.StringType }
+                navArgument(Screen.Crop.imagePathArg) { type = NavType.StringType },
+                navArgument(Screen.Crop.cornersArg) { 
+                    type = NavType.StringType 
+                    defaultValue = ""
+                    nullable = true
+                }
             )
         ) { backStackEntry ->
             val imagePath = backStackEntry.arguments?.getString(Screen.Crop.imagePathArg)
+            val cornersStr = backStackEntry.arguments?.getString(Screen.Crop.cornersArg)
+            
             if (imagePath != null) {
                 CropAndPreviewScreen(
                     imagePath = imagePath,
+                    initialCornersString = cornersStr,
                     onBack = navController::popBackStack,
                     onNavigateToOcr = { processedPath ->
                         navController.navigate(Screen.Ocr.createRoute(processedPath)) {

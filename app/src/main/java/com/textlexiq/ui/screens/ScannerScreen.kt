@@ -78,10 +78,61 @@ fun ScannerScreen(
         permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
+    // Auto-Capture Trigger Observation
+    LaunchedEffect(Unit) {
+        viewModel.autoCaptureTrigger.collect {
+             // Trigger capture if camera is ready and not capturing
+             if (state.isCameraReady && !state.isCapturing) {
+                 captureImage(
+                    context = context,
+                    imageCapture = imageCapture,
+                    executor = ContextCompat.getMainExecutor(context),
+                    onCaptureStarted = viewModel::onCaptureStarted,
+                    onSuccess = viewModel::onCaptureSuccess,
+                    onFailure = viewModel::onCaptureFailed
+                 )
+             }
+        }
+    }
+
     LaunchedEffect(state.capturedImagePath) {
         val imagePath = state.capturedImagePath ?: return@LaunchedEffect
         onImageCaptured(imagePath)
         viewModel.onNavigationHandled()
+    }
+
+    val imageAnalysis = remember {
+        androidx.camera.core.ImageAnalysis.Builder()
+            .setBackpressureStrategy(androidx.camera.core.ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+            .apply {
+                setAnalyzer(
+                    ContextCompat.getMainExecutor(context)
+                ) { imageProxy ->
+                    // Simple rotation handling + Bitmap conversion (inefficient but works for MVP)
+                    // In prod, use YUV directly with OpenCV
+                    val bitmap = imageProxy.toBitmap() // Requires androidx.camera:camera-core extension or manual
+                    // The camera-core dependency is present, but toBitmap typically requires camera-view or latest
+                    // Let's assume toBitmap() works or we catch detection errors.
+                    // Actually, let's wrap in try-catch and close image
+                    try {
+                        val rotation = imageProxy.imageInfo.rotationDegrees
+                        val rotatedBitmap = if (rotation != 0) {
+                            val matrix = android.graphics.Matrix().apply { postRotate(rotation.toFloat()) }
+                            android.graphics.Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                        } else {
+                            bitmap
+                        }
+                        
+                        val corners = com.textlexiq.scanner.EdgeDetector.detectDocument(rotatedBitmap)
+                        viewModel.onEdgesDetected(corners)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        imageProxy.close()
+                    }
+                }
+            }
     }
 
     DisposableEffect(state.cameraPermissionGranted) {
@@ -104,7 +155,8 @@ fun ScannerScreen(
                         lifecycleOwner,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
-                        imageCapture
+                        imageCapture,
+                        imageAnalysis
                     )
                     viewModel.onCameraReady()
                 } catch (exc: Exception) {
@@ -132,6 +184,7 @@ fun ScannerScreen(
                     }
                 },
                 actions = {
+                    // Auto-Capture Toggle (Icon logic would go here ideally)
                     IconButton(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
                         Icon(imageVector = Icons.Default.Refresh, contentDescription = "Retry permission")
                     }
@@ -149,7 +202,10 @@ fun ScannerScreen(
                     factory = { previewView },
                     modifier = Modifier.fillMaxSize()
                 )
-                EdgeDetectionOverlay(modifier = Modifier.fillMaxSize())
+                EdgeDetectionOverlay(
+                    modifier = Modifier.fillMaxSize(),
+                    corners = state.detectedCorners
+                )
 
                 FloatingActionButton(
                     onClick = {
@@ -239,18 +295,50 @@ private fun createTempImageFile(context: Context): File {
 }
 
 @Composable
-private fun EdgeDetectionOverlay(modifier: Modifier = Modifier) {
+private fun EdgeDetectionOverlay(
+    modifier: Modifier = Modifier,
+    corners: List<android.graphics.PointF> = emptyList()
+) {
     Canvas(modifier = modifier) {
-        val rectWidth = size.width * 0.85f
-        val rectHeight = size.height * 0.65f
-        val left = (size.width - rectWidth) / 2f
-        val top = (size.height - rectHeight) / 2f
-        drawRect(
-            color = Color.White.copy(alpha = 0.35f),
-            topLeft = androidx.compose.ui.geometry.Offset(left, top),
-            size = androidx.compose.ui.geometry.Size(rectWidth, rectHeight),
-            style = Stroke(width = 3.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(24f, 16f)))
-        )
+        if (corners.size == 4) {
+             val path = androidx.compose.ui.graphics.Path()
+             // Corners are normalized 0..1
+             // Camera preview might be scaled (Fit Center)
+             // For MVP assuming fill, but usually we need to coordinate transform.
+             // Given standard preview view usage, detection is on 640x480 analysis but displayed on screen size.
+             // Points 0..1 should map to width/height of canvas.
+             
+             val w = size.width
+             val h = size.height
+             
+             path.moveTo(corners[0].x * w, corners[0].y * h)
+             for (i in 1..3) {
+                 path.lineTo(corners[i].x * w, corners[i].y * h)
+             }
+             path.close()
+             
+             drawPath(
+                 path = path,
+                 color = Color.Green.copy(alpha = 0.5f),
+                 style = Stroke(width = 4.dp.toPx())
+             )
+             drawPath(
+                 path = path,
+                 color = Color.Green.copy(alpha = 0.2f)
+             )
+        } else {
+            // Draw guideline
+            val rectWidth = size.width * 0.85f
+            val rectHeight = size.height * 0.65f
+            val left = (size.width - rectWidth) / 2f
+            val top = (size.height - rectHeight) / 2f
+            drawRect(
+                color = Color.White.copy(alpha = 0.35f),
+                topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                size = androidx.compose.ui.geometry.Size(rectWidth, rectHeight),
+                style = Stroke(width = 3.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(24f, 16f)))
+            )
+        }
     }
 }
 

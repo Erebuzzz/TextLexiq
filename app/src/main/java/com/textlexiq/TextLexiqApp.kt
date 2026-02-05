@@ -7,9 +7,12 @@ import org.opencv.android.OpenCVLoader
 class TextLexiqApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        val initialized = OpenCVLoader.initDebug()
-        if (!initialized) {
-            Log.w("TextLexiqApp", "Failed to initialize OpenCV; image preprocessing will be degraded until runtime init succeeds.")
+        container = DefaultAppContainer(this)
+        
+        if (OpenCVLoader.initDebug()) {
+            Log.i("TextLexiqApp", "OpenCV loaded successfully")
+        } else {
+            Log.e("TextLexiqApp", "OpenCV initialization failed!")
         }
     }
 }

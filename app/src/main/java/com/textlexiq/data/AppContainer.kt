@@ -33,8 +33,8 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         UserPreferencesRepository(context)
     }
 
-    override val smartModelRouter: com.textlexiq.llm.router.SmartModelRouter by lazy {
-        com.textlexiq.llm.router.SmartModelRouter()
+    override val smartModelRouter: SmartModelRouter by lazy {
+        SmartModelRouter(modelManager)
     }
 
     override val modelManager: com.textlexiq.data.model.ModelManager by lazy {
