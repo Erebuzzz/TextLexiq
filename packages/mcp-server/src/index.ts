@@ -1,20 +1,21 @@
-import { createHTTPServer, Tool } from "@leanmcp/core";
-import { z } from "zod";
+import { createHTTPServer, Tool, MCPServer, SchemaConstraint } from "@leanmcp/core";
 import { spawn } from "child_process";
 import path from "path";
 
 // Define Schema using Zod (standard for MCP tools)
-const OcrInputSchema = z.object({
-    imagePath: z.string().describe("Absolute path to the image file to process"),
-});
+
+
+class OcrInput {
+    @SchemaConstraint({ description: "Absolute path to the image file to process" })
+    imagePath!: string;
+}
 
 class TextLexiqTools {
     @Tool({
-        name: "ocr_document",
         description: "Extract text from an image document using TextLexiq engine",
-        schema: OcrInputSchema,
+        inputClass: OcrInput,
     })
-    async ocrDocument(input: z.infer<typeof OcrInputSchema>) {
+    async ocr_document(input: OcrInput) {
         return new Promise((resolve, reject) => {
             // Resolve path to python script
             // Assuming structure: packages/mcp-server/src/index.ts -> packages/python-logic/main.py
@@ -54,8 +55,14 @@ class TextLexiqTools {
 }
 
 // Start Server
-const server = createHTTPServer({
-    tools: [new TextLexiqTools()],
+const server = createHTTPServer(async () => {
+    const mcpServer = new MCPServer({
+        name: "textlexiq-mcp-server",
+        version: "1.0.0",
+    });
+    mcpServer.registerService(new TextLexiqTools());
+    return mcpServer.getServer();
+}, {
     port: 3000,
 });
 

@@ -6,7 +6,7 @@
         "build": "tsc"
     },
     "dependencies": {
-        "@leanmcp/core": "^1.0.0",
+        "@leanmcp/core": "^0.4.7",
         "zod": "^3.22.4"
     },
     "devDependencies": {
